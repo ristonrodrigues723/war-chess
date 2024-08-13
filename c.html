@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Chessboard with Three.js</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+    <script>
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+ 
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.25;
+        controls.enableZoom = true;
+
+  
+        const boardSize = 8;
+        const squareSize = 1;
+        const boardGroup = new THREE.Group();
+        for (let i = 0; i < boardSize; i++) {
+            for (let j = 0; j < boardSize; j++) {
+                const geometry = new THREE.BoxGeometry(squareSize, squareSize, 0.1);
+                const material = new THREE.MeshBasicMaterial({ color: (i + j) % 2 === 0 ? 0xffffff : 0x000000 });
+                const square = new THREE.Mesh(geometry, material);
+                square.position.set(i - boardSize / 2, j - boardSize / 2, 0);
+                boardGroup.add(square);
+            }
+        }
+        scene.add(boardGroup);
+
+
+        const pieceSpaceSize = 2;
+        const pieceSpaceMaterial = new THREE.MeshBasicMaterial({ color: 0x808080 });
+        for (let i = 0; i < boardSize; i++) {
+            const leftSpace = new THREE.Mesh(new THREE.BoxGeometry(pieceSpaceSize, squareSize, 0.1), pieceSpaceMaterial);
+            leftSpace.position.set(-boardSize / 2 - pieceSpaceSize / 2, i - boardSize / 2, 0);
+            boardGroup.add(leftSpace);
+
+            const rightSpace = new THREE.Mesh(new THREE.BoxGeometry(pieceSpaceSize, squareSize, 0.1), pieceSpaceMaterial);
+            rightSpace.position.set(boardSize / 2 + pieceSpaceSize / 2, i - boardSize / 2, 0);
+            boardGroup.add(rightSpace);
+        }
+
+ 
+        const pieceGeometry = new THREE.SphereGeometry(0.4, 32, 32);
+        const whiteMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const blackMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+        for (let i = 0; i < boardSize; i++) {
+            for (let j = 0; j < 2; j++) {
+                const piece = new THREE.Mesh(pieceGeometry, whiteMaterial);
+                piece.position.set(i - boardSize / 2, j - boardSize / 2, 0.5);
+                boardGroup.add(piece);
+            }
+            for (let j = 6; j < 8; j++) {
+                const piece = new THREE.Mesh(pieceGeometry, blackMaterial);
+                piece.position.set(i - boardSize / 2, j - boardSize / 2, 0.5);
+                boardGroup.add(piece);
+            }
+        }
+
+
+        camera.position.set(0, -10, 10);
+        camera.lookAt(0, 0, 0);
+
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
