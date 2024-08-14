@@ -52,7 +52,6 @@
     const squareSize = 1;
     const boardGroup = new THREE.Group();
 
-    // Chess piece geometries
     const pawnGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.6, 32);
     const rookGeometry = new THREE.BoxGeometry(0.4, 0.6, 0.4);
     const knightGeometry = new THREE.ConeGeometry(0.3, 0.7, 32);
@@ -74,25 +73,31 @@
       return square;
     }
 
-    function createPiece(geometry, material, x, z) {
+    function createPiece(geometry, material, x, z, type, color) {
       const piece = new THREE.Mesh(geometry, material);
       piece.position.set(x - boardWidth / 2 + 0.5, 0.3, z - boardHeight / 2 + 0.5);
+      piece.userData = { type, color, x, z };
       return piece;
     }
 
     const pieces = [];
     function setupChessPieces() {
-      // Set up pawns
-      for (let i = 0; i < 8; i++) {
-        pieces.push(createPiece(pawnGeometry, whiteMaterial, i, 1));
-        pieces.push(createPiece(pawnGeometry, blackMaterial, i, 6));
-      }
+      const setupOrder = [
+        { geo: rookGeometry, type: 'rook' },
+        { geo: knightGeometry, type: 'knight' },
+        { geo: bishopGeometry, type: 'bishop' },
+        { geo: queenGeometry, type: 'queen' },
+        { geo: kingGeometry, type: 'king' },
+        { geo: bishopGeometry, type: 'bishop' },
+        { geo: knightGeometry, type: 'knight' },
+        { geo: rookGeometry, type: 'rook' }
+      ];
 
-      // Set up other pieces
-      const setupOrder = [rookGeometry, knightGeometry, bishopGeometry, queenGeometry, kingGeometry, bishopGeometry, knightGeometry, rookGeometry];
       for (let i = 0; i < 8; i++) {
-        pieces.push(createPiece(setupOrder[i], whiteMaterial, i, 0));
-        pieces.push(createPiece(setupOrder[i], blackMaterial, i, 7));
+        pieces.push(createPiece(pawnGeometry, whiteMaterial, i, 1, 'pawn', 'white'));
+        pieces.push(createPiece(pawnGeometry, blackMaterial, i, 6, 'pawn', 'black'));
+        pieces.push(createPiece(setupOrder[i].geo, whiteMaterial, i, 0, setupOrder[i].type, 'white'));
+        pieces.push(createPiece(setupOrder[i].geo, blackMaterial, i, 7, setupOrder[i].type, 'black'));
       }
 
       pieces.forEach(piece => boardGroup.add(piece));
@@ -136,6 +141,32 @@
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
+    function isValidMove(piece, newX, newZ) {
+      const dx = Math.abs(newX - piece.userData.x);
+      const dz = Math.abs(newZ - piece.userData.z);
+
+      switch (piece.userData.type) {
+        case 'pawn':
+          if (piece.userData.color === 'white') {
+            return newX === piece.userData.x && newZ === piece.userData.z + 1;
+          } else {
+            return newX === piece.userData.x && newZ === piece.userData.z - 1;
+          }
+        case 'rook':
+          return dx === 0 || dz === 0;
+        case 'knight':
+          return (dx === 1 && dz === 2) || (dx === 2 && dz === 1);
+        case 'bishop':
+          return dx === dz;
+        case 'queen':
+          return dx === dz || dx === 0 || dz === 0;
+        case 'king':
+          return dx <= 1 && dz <= 1;
+        default:
+          return false;
+      }
+    }
+
     function onMouseDown(event) {
       event.preventDefault();
       mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -154,9 +185,18 @@
         const boardIntersects = raycaster.intersectObjects(boardGroup.children.filter(child => child.geometry.type === 'BoxGeometry'));
         if (boardIntersects.length > 0) {
           const newPosition = boardIntersects[0].point;
-          selectedPiece.position.x = Math.round(newPosition.x);
-          selectedPiece.position.z = Math.round(newPosition.z);
-          selectedPiece.position.y = 0.3;
+          const newX = Math.round(newPosition.x + boardWidth / 2 - 0.5);
+          const newZ = Math.round(newPosition.z + boardHeight / 2 - 0.5);
+
+          if (isValidMove(selectedPiece, newX, newZ)) {
+            selectedPiece.position.x = newX - boardWidth / 2 + 0.5;
+            selectedPiece.position.z = newZ - boardHeight / 2 + 0.5;
+            selectedPiece.position.y = 0.3;
+            selectedPiece.userData.x = newX;
+            selectedPiece.userData.z = newZ;
+          } else {
+            selectedPiece.position.y = 0.3;
+          }
         }
         selectedPiece = null;
       }
