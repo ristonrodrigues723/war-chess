@@ -31,6 +31,18 @@
     button:hover {
       background-color: #2980b9;
     }
+    #message-box {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.7);
+      padding: 10px;
+      border-radius: 5px;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -38,7 +50,9 @@
     <button id="zoomInBtn">Zoom In</button>
     <button id="zoomOutBtn">Zoom Out</button>
   </div>
+  <div id="message-box"></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script> 
   <script>
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -53,7 +67,30 @@
     const boardGroup = new THREE.Group();
 
     const pawnGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.6, 32);
-    const rookGeometry = new THREE.BoxGeometry(0.4, 0.6, 0.4);
+    
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+const cube = new THREE.Mesh(geometry, material);
+scene.add(cube);
+
+
+    let tankModel;
+    function loadTankModel() {
+  const loader = new THREE.GLTFLoader();
+  return new Promise((resolve, reject) => {
+    loader.load(
+      'gift/scene.gltf',
+      (gltf) => {
+        tankModel = gltf.scene;
+        tankModel.scale.set(0.1, 0.1, 0.1); // Adjust scale as needed
+        resolve();
+      },
+      undefined,
+      reject
+    );
+  });
+}
+
     const knightGeometry = new THREE.ConeGeometry(0.3, 0.7, 32);
     const bishopGeometry = new THREE.ConeGeometry(0.3, 0.8, 32);
     const queenGeometry = new THREE.SphereGeometry(0.4, 32, 32);
@@ -75,34 +112,45 @@
     }
 
     function createPiece(geometry, material, x, z, type, color) {
-      const piece = new THREE.Mesh(geometry, material);
-      piece.position.set(x - boardWidth / 2 + 0.5, 0.3, z - boardHeight / 2 + 0.5);
-      piece.userData = { type, color, x, z };
-      return piece;
-    }
+  let piece;
+  if (type === 'rook') {
+    piece = tankModel.clone();
+    piece.position.y = 0.15; // Adjust the y-position of the tank if needed
+  } else {
+    piece = new THREE.Mesh(geometry, material);
+  }
+  piece.position.set(x - boardWidth / 2 + 0.5, piece.position.y, z - boardHeight / 2 + 0.5);
+  if (type === 'rook' && color === 'black') {
+    piece.rotation.y = Math.PI; // Rotate black tanks to face the other direction
+  }
+  piece.userData = { type, color, x, z };
+  return piece;
+}
 
     const pieces = [];
-    function setupChessPieces() {
-      const setupOrder = [
-        { geo: rookGeometry, type: 'rook' },
-        { geo: knightGeometry, type: 'knight' },
-        { geo: bishopGeometry, type: 'bishop' },
-        { geo: queenGeometry, type: 'queen' },
-        { geo: kingGeometry, type: 'king' },
-        { geo: bishopGeometry, type: 'bishop' },
-        { geo: knightGeometry, type: 'knight' },
-        { geo: rookGeometry, type: 'rook' }
-      ];
+    async function setupChessPieces() {
+  await loadTankModel(); // Load the tank model before setting up pieces
 
-      for (let i = 0; i < 8; i++) {
-        pieces.push(createPiece(pawnGeometry, whiteMaterial, i, 1, 'pawn', 'white'));
-        pieces.push(createPiece(pawnGeometry, blackMaterial, i, 6, 'pawn', 'black'));
-        pieces.push(createPiece(setupOrder[i].geo, whiteMaterial, i, 0, setupOrder[i].type, 'white'));
-        pieces.push(createPiece(setupOrder[i].geo, blackMaterial, i, 7, setupOrder[i].type, 'black'));
-      }
+  const setupOrder = [
+    { geo: null, type: 'rook' }, // Use null for rook (tank) geometry
+    { geo: knightGeometry, type: 'knight' },
+    { geo: bishopGeometry, type: 'bishop' },
+    { geo: queenGeometry, type: 'queen' },
+    { geo: kingGeometry, type: 'king' },
+    { geo: bishopGeometry, type: 'bishop' },
+    { geo: knightGeometry, type: 'knight' },
+    { geo: null, type: 'rook' } // Use null for rook (tank) geometry
+  ];
 
-      pieces.forEach(piece => boardGroup.add(piece));
-    }
+  for (let i = 0; i < 8; i++) {
+    pieces.push(createPiece(pawnGeometry, whiteMaterial, i, 1, 'pawn', 'white'));
+    pieces.push(createPiece(pawnGeometry, blackMaterial, i, 6, 'pawn', 'black'));
+    pieces.push(createPiece(setupOrder[i].geo, whiteMaterial, i, 0, setupOrder[i].type, 'white'));
+    pieces.push(createPiece(setupOrder[i].geo, blackMaterial, i, 7, setupOrder[i].type, 'black'));
+  }
+
+  pieces.forEach(piece => boardGroup.add(piece));
+}
 
     for (let i = 0; i < boardWidth; i++) {
       for (let j = 0; j < boardHeight; j++) {
@@ -144,25 +192,62 @@
     let currentTurn = 'white';
     const highlightedSquares = [];
 
+    function isPathClear(startX, startZ, endX, endZ) {
+      const dx = Math.sign(endX - startX);
+      const dz = Math.sign(endZ - startZ);
+      let x = startX + dx;
+      let z = startZ + dz;
+
+      while (x !== endX || z !== endZ) {
+        if (getPieceAt(x, z)) return false;
+        x += dx;
+        z += dz;
+      }
+
+      return true;
+    }
+
     function isValidMove(piece, newX, newZ) {
       const dx = Math.abs(newX - piece.userData.x);
       const dz = Math.abs(newZ - piece.userData.z);
+      const targetPiece = getPieceAt(newX, newZ);
+
+      if (targetPiece && targetPiece.userData.color === piece.userData.color) {
+        return false;
+      }
 
       switch (piece.userData.type) {
         case 'pawn':
           if (piece.userData.color === 'white') {
-            return newX === piece.userData.x && (newZ === piece.userData.z + 1 || (piece.userData.z === 1 && newZ === 3));
+            if (newX === piece.userData.x && newZ === piece.userData.z + 1 && !targetPiece) {
+              return true;
+            }
+            if (piece.userData.z === 1 && newX === piece.userData.x && newZ === 3 && !targetPiece && !getPieceAt(newX, 2)) {
+              return true;
+            }
+            if (Math.abs(newX - piece.userData.x) === 1 && newZ === piece.userData.z + 1 && targetPiece) {
+              return true;
+            }
           } else {
-            return newX === piece.userData.x && (newZ === piece.userData.z - 1 || (piece.userData.z === 6 && newZ === 4));
+            if (newX === piece.userData.x && newZ === piece.userData.z - 1 && !targetPiece) {
+              return true;
+            }
+            if (piece.userData.z === 6 && newX === piece.userData.x && newZ === 4 && !targetPiece && !getPieceAt(newX, 5)) {
+              return true;
+            }
+            if (Math.abs(newX - piece.userData.x) === 1 && newZ === piece.userData.z - 1 && targetPiece) {
+              return true;
+            }
           }
+          return false;
         case 'rook':
-          return dx === 0 || dz === 0;
+          return (dx === 0 || dz === 0) && isPathClear(piece.userData.x, piece.userData.z, newX, newZ);
         case 'knight':
           return (dx === 1 && dz === 2) || (dx === 2 && dz === 1);
         case 'bishop':
-          return dx === dz;
+          return dx === dz && isPathClear(piece.userData.x, piece.userData.z, newX, newZ);
         case 'queen':
-          return dx === dz || dx === 0 || dz === 0;
+          return (dx === dz || dx === 0 || dz === 0) && isPathClear(piece.userData.x, piece.userData.z, newX, newZ);
         case 'king':
           return dx <= 1 && dz <= 1;
         default:
@@ -174,7 +259,7 @@
       clearHighlights();
       for (let x = 0; x < 8; x++) {
         for (let z = 0; z < 8; z++) {
-          if (isValidMove(piece, x, z) && !isPieceAt(x, z, piece.userData.color)) {
+          if (isValidMove(piece, x, z)) {
             const highlight = new THREE.Mesh(
               new THREE.BoxGeometry(squareSize, 0.1, squareSize),
               highlightMaterial
@@ -192,10 +277,6 @@
       highlightedSquares.length = 0;
     }
 
-    function isPieceAt(x, z, color) {
-      return pieces.some(p => p.userData.x === x && p.userData.z === z && p.userData.color === color);
-    }
-
     function getPieceAt(x, z) {
       return pieces.find(p => p.userData.x === x && p.userData.z === z);
     }
@@ -207,12 +288,19 @@
         pieces.splice(pieces.indexOf(capturedPiece), 1);
       }
 
+      const oldX = piece.userData.x;
+      const oldZ = piece.userData.z;
+
       piece.position.x = newX - boardWidth / 2 + 0.5;
       piece.position.z = newZ - boardHeight / 2 + 0.5;
       piece.userData.x = newX;
       piece.userData.z = newZ;
 
+      updateMessageBox(`${currentTurn.charAt(0).toUpperCase() + currentTurn.slice(1)} moved ${piece.userData.type} from ${String.fromCharCode(97 + oldX)}${oldZ + 1} to ${String.fromCharCode(97 + newX)}${newZ + 1}`);
+
       currentTurn = currentTurn === 'white' ? 'black' : 'white';
+      updateMessageBox(`${currentTurn.charAt(0).toUpperCase() + currentTurn.slice(1)}'s turn`);
+
       if (currentTurn === 'black') {
         setTimeout(makeAIMove, 500);
       }
@@ -225,7 +313,7 @@
       blackPieces.forEach(piece => {
         for (let x = 0; x < 8; x++) {
           for (let z = 0; z < 8; z++) {
-            if (isValidMove(piece, x, z) && !isPieceAt(x, z, 'black')) {
+            if (isValidMove(piece, x, z)) {
               validMoves.push({ piece, x, z });
             }
           }
@@ -260,36 +348,69 @@
           const newX = Math.round(newPosition.x + boardWidth / 2 - 0.5);
           const newZ = Math.round(newPosition.z + boardHeight / 2 - 0.5);
 
-          if (isValidMove(selectedPiece, newX, newZ) && !isPieceAt(newX, newZ, currentTurn)) {
+          if (isValidMove(selectedPiece, newX, newZ)) {
             movePiece(selectedPiece, newX, newZ);
-            clearHighlights();
           }
-          selectedPiece.position.y = 0.3;
-          selectedPiece = null;
         }
+        selectedPiece.position.y -= 0.2;
+        selectedPiece = null;
+        clearHighlights();
       }
+    }
+
+    function updateMessageBox(message) {
+      const messageBox = document.getElementById('message-box');
+      messageBox.textContent = message;
     }
 
     function animate() {
       requestAnimationFrame(animate);
       renderer.render(scene, camera);
     }
+    async function initializeGame() {
+  for (let i = 0; i < boardWidth; i++) {
+    for (let j = 0; j < boardHeight; j++) {
+      boardGroup.add(createSquare(i, j));
+    }
+  }
 
-    document.addEventListener('wheel', onMouseWheel);
-    document.addEventListener('mousedown', onMouseDown);
+  await setupChessPieces();
+  scene.add(boardGroup);
 
-    animate();
+  const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+  scene.add(ambientLight);
 
-    window.addEventListener('resize', onWindowResize, false);
+  const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.5);
+  directionalLight1.position.set(5, 5, 5);
+  scene.add(directionalLight1);
 
-    function onWindowResize() {
+  const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
+  directionalLight2.position.set(-5, 5, -5);
+  scene.add(directionalLight2);
+
+  camera.position.set(0, 7, 10);
+  camera.lookAt(0, 0, 0);
+
+  updateMessageBox("White's turn");
+  animate();
+}
+
+
+    window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
-    }
+    });
+
+    renderer.domElement.addEventListener('mousedown', onMouseDown, false);
+    renderer.domElement.addEventListener('wheel', onMouseWheel, false);
 
     document.getElementById('zoomInBtn').addEventListener('click', () => zoom(-1));
     document.getElementById('zoomOutBtn').addEventListener('click', () => zoom(1));
+
+    updateMessageBox("White's turn");
+ 
+    initializeGame();
   </script>
 </body>
 </html>
