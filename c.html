@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive Chessboard</title>
+  <title>Interactive Chessboard with AI</title>
   <style>
     body { margin: 0; background-color: #2c3e50; }
     canvas { display: block; }
@@ -61,6 +61,7 @@
 
     const whiteMaterial = new THREE.MeshPhongMaterial({ color: 0xFFFFFF });
     const blackMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
+    const highlightMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.5 });
 
     function createSquare(i, j) {
       const geometry = new THREE.BoxGeometry(squareSize, 0.1, squareSize);
@@ -140,6 +141,8 @@
     let selectedPiece = null;
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
+    let currentTurn = 'white';
+    const highlightedSquares = [];
 
     function isValidMove(piece, newX, newZ) {
       const dx = Math.abs(newX - piece.userData.x);
@@ -148,9 +151,9 @@
       switch (piece.userData.type) {
         case 'pawn':
           if (piece.userData.color === 'white') {
-            return newX === piece.userData.x && newZ === piece.userData.z + 1;
+            return newX === piece.userData.x && (newZ === piece.userData.z + 1 || (piece.userData.z === 1 && newZ === 3));
           } else {
-            return newX === piece.userData.x && newZ === piece.userData.z - 1;
+            return newX === piece.userData.x && (newZ === piece.userData.z - 1 || (piece.userData.z === 6 && newZ === 4));
           }
         case 'rook':
           return dx === 0 || dz === 0;
@@ -167,6 +170,74 @@
       }
     }
 
+    function showPossibleMoves(piece) {
+      clearHighlights();
+      for (let x = 0; x < 8; x++) {
+        for (let z = 0; z < 8; z++) {
+          if (isValidMove(piece, x, z) && !isPieceAt(x, z, piece.userData.color)) {
+            const highlight = new THREE.Mesh(
+              new THREE.BoxGeometry(squareSize, 0.1, squareSize),
+              highlightMaterial
+            );
+            highlight.position.set(x - boardWidth / 2 + 0.5, 0.05, z - boardHeight / 2 + 0.5);
+            boardGroup.add(highlight);
+            highlightedSquares.push(highlight);
+          }
+        }
+      }
+    }
+
+    function clearHighlights() {
+      highlightedSquares.forEach(highlight => boardGroup.remove(highlight));
+      highlightedSquares.length = 0;
+    }
+
+    function isPieceAt(x, z, color) {
+      return pieces.some(p => p.userData.x === x && p.userData.z === z && p.userData.color === color);
+    }
+
+    function getPieceAt(x, z) {
+      return pieces.find(p => p.userData.x === x && p.userData.z === z);
+    }
+
+    function movePiece(piece, newX, newZ) {
+      const capturedPiece = getPieceAt(newX, newZ);
+      if (capturedPiece) {
+        boardGroup.remove(capturedPiece);
+        pieces.splice(pieces.indexOf(capturedPiece), 1);
+      }
+
+      piece.position.x = newX - boardWidth / 2 + 0.5;
+      piece.position.z = newZ - boardHeight / 2 + 0.5;
+      piece.userData.x = newX;
+      piece.userData.z = newZ;
+
+      currentTurn = currentTurn === 'white' ? 'black' : 'white';
+      if (currentTurn === 'black') {
+        setTimeout(makeAIMove, 500);
+      }
+    }
+
+    function makeAIMove() {
+      const blackPieces = pieces.filter(p => p.userData.color === 'black');
+      const validMoves = [];
+
+      blackPieces.forEach(piece => {
+        for (let x = 0; x < 8; x++) {
+          for (let z = 0; z < 8; z++) {
+            if (isValidMove(piece, x, z) && !isPieceAt(x, z, 'black')) {
+              validMoves.push({ piece, x, z });
+            }
+          }
+        }
+      });
+
+      if (validMoves.length > 0) {
+        const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+        movePiece(randomMove.piece, randomMove.x, randomMove.z);
+      }
+    }
+
     function onMouseDown(event) {
       event.preventDefault();
       mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -175,12 +246,13 @@
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(pieces);
 
-      if (intersects.length > 0) {
+      if (intersects.length > 0 && intersects[0].object.userData.color === currentTurn) {
         if (selectedPiece) {
           selectedPiece.position.y -= 0.2;
         }
         selectedPiece = intersects[0].object;
         selectedPiece.position.y += 0.2;
+        showPossibleMoves(selectedPiece);
       } else if (selectedPiece) {
         const boardIntersects = raycaster.intersectObjects(boardGroup.children.filter(child => child.geometry.type === 'BoxGeometry'));
         if (boardIntersects.length > 0) {
@@ -188,17 +260,13 @@
           const newX = Math.round(newPosition.x + boardWidth / 2 - 0.5);
           const newZ = Math.round(newPosition.z + boardHeight / 2 - 0.5);
 
-          if (isValidMove(selectedPiece, newX, newZ)) {
-            selectedPiece.position.x = newX - boardWidth / 2 + 0.5;
-            selectedPiece.position.z = newZ - boardHeight / 2 + 0.5;
-            selectedPiece.position.y = 0.3;
-            selectedPiece.userData.x = newX;
-            selectedPiece.userData.z = newZ;
-          } else {
-            selectedPiece.position.y = 0.3;
+          if (isValidMove(selectedPiece, newX, newZ) && !isPieceAt(newX, newZ, currentTurn)) {
+            movePiece(selectedPiece, newX, newZ);
+            clearHighlights();
           }
+          selectedPiece.position.y = 0.3;
+          selectedPiece = null;
         }
-        selectedPiece = null;
       }
     }
 
