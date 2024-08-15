@@ -137,9 +137,10 @@ function createPiece(geometry, material, x, z, type, color) {
   let piece;
   if (type === 'rook') {
     piece = tankModel.clone();
-    piece.position.y = 0.15;
+    piece.position.y = 0.05; 
   } else {
     piece = new THREE.Mesh(geometry, material);
+    piece.position.y = 0.05; 
   }
   piece.position.set(x * squareSize, piece.position.y, z * squareSize);
   if (type === 'rook' && color === 'black') {
@@ -183,16 +184,7 @@ function createPiece(geometry, material, x, z, type, color) {
     setupChessPieces();
     scene.add(boardGroup);
 
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
-    scene.add(ambientLight);
 
-    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.5);
-    directionalLight1.position.set(5, 5, 5);
-    scene.add(directionalLight1);
-
-    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
-    directionalLight2.position.set(-5, 5, -5);
-    scene.add(directionalLight2);
 
     camera.position.set(0, 7, 10);
     camera.lookAt(0, 0, 0);
@@ -304,19 +296,19 @@ function createPiece(geometry, material, x, z, type, color) {
     }
 
     function movePiece(piece, newX, newZ) {
-      const capturedPiece = getPieceAt(newX, newZ);
-      if (capturedPiece) {
-        boardGroup.remove(capturedPiece);
-        pieces.splice(pieces.indexOf(capturedPiece), 1);
-      }
+  const capturedPiece = getPieceAt(newX, newZ);
+  if (capturedPiece) {
+    boardGroup.remove(capturedPiece);
+    pieces.splice(pieces.indexOf(capturedPiece), 1);
+  }
 
-      const oldX = piece.userData.x;
-      const oldZ = piece.userData.z;
+  const oldX = piece.userData.x;
+  const oldZ = piece.userData.z;
 
-      piece.position.x = newX - boardWidth / 2 + 0.5;
-      piece.position.z = newZ - boardHeight / 2 + 0.5;
-      piece.userData.x = newX;
-      piece.userData.z = newZ;
+  piece.position.x = newX * squareSize;
+  piece.position.z = newZ * squareSize;
+  piece.userData.x = newX;
+  piece.userData.z = newZ;
 
       updateMessageBox(`${currentTurn.charAt(0).toUpperCase() + currentTurn.slice(1)} moved ${piece.userData.type} from ${String.fromCharCode(97 + oldX)}${oldZ + 1} to ${String.fromCharCode(97 + newX)}${newZ + 1}`);
 
@@ -349,6 +341,36 @@ function createPiece(geometry, material, x, z, type, color) {
     }
 
     function onMouseDown(event) {
+  event.preventDefault();
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(pieces);
+
+  if (intersects.length > 0 && intersects[0].object.userData.color === currentTurn) {
+    if (selectedPiece) {
+      selectedPiece.position.y -= 0.2;
+    }
+    selectedPiece = intersects[0].object;
+    selectedPiece.position.y += 0.2;
+    showPossibleMoves(selectedPiece);
+  } else if (selectedPiece) {
+    const boardIntersects = raycaster.intersectObjects(boardGroup.children.filter(child => child.geometry.type === 'BoxGeometry'));
+    if (boardIntersects.length > 0) {
+      const newPosition = boardIntersects[0].point;
+      const newX = Math.floor((newPosition.x + 4 * squareSize) / squareSize);
+      const newZ = Math.floor((newPosition.z + 4 * squareSize) / squareSize);
+
+      if (isValidMove(selectedPiece, newX, newZ)) {
+        movePiece(selectedPiece, newX, newZ);
+      }
+    }
+    selectedPiece.position.y -= 0.2;
+    selectedPiece = null;
+    clearHighlights();
+  }
+}
       event.preventDefault();
       mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -386,7 +408,7 @@ function createPiece(geometry, material, x, z, type, color) {
         selectedPiece = null;
         clearHighlights();
       }
-    }
+    
 
     function updateMessageBox(message) {
       const messageBox = document.getElementById('message-box');
@@ -403,6 +425,17 @@ function createPiece(geometry, material, x, z, type, color) {
       boardGroup.add(createSquare(i, j));
     }
   }
+
+  await setupChessPieces();
+  scene.add(boardGroup);
+
+
+  boardGroup.position.set(-3.5 * squareSize, 0, -3.5 * squareSize);
+
+
+}
+
+
 
   await setupChessPieces();
   scene.add(boardGroup);
@@ -428,7 +461,7 @@ function createPiece(geometry, material, x, z, type, color) {
 
   updateMessageBox("White's turn");
   animate();
-}
+
 
 
     window.addEventListener('resize', () => {
