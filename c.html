@@ -5,69 +5,69 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Interactive Chessboard with AI</title>
   <style>
-body {
-  font-family: Arial, sans-serif;
-  background-color: #2c3e50;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  margin: 0;
-}
-#chessboard {
-
-  width: 600px;
-  height: 600px;
-  perspective: 1000px;
-}
-
-.square {
-
-  width: 75px;
-  height: 75px;
-  border: 1px solid #333;
-  box-shadow: inset 0px 0px 5px rgba(0, 0, 0, 0.2);
-}
-
-.piece {
-
-  position: absolute;
-  transform-style: preserve-3d;
-  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
-}
-controls {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  background: rgba(255, 255, 255, 0.8);
-  padding: 15px;
-  border-radius: 10px;
-  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2);
-}
-
-button {
-
-  background-color: #428bca;
-  color: white;
-  padding: 10px 15px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 16px;
-  margin: 5px;
-}
-#message-box {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(255, 255, 255, 0.8);
-  padding: 15px;
-  border-radius: 10px;
-  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2);
-  font-size: 18px;
-}
-  </style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #2c3e50;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    #chessboard {
+    
+      width: 600px;
+      height: 600px;
+      perspective: 1000px;
+    }
+    
+    .square {
+    
+      width: 75px;
+      height: 75px;
+      border: 1px solid #333;
+      box-shadow: inset 0px 0px 5px rgba(0, 0, 0, 0.2);
+    }
+    
+    .piece {
+    
+      position: absolute;
+      transform-style: preserve-3d;
+      box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
+    }
+    controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2);
+    }
+    
+    button {
+    
+      background-color: #141414;
+      color: white;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 5px;
+    }
+    #message-box {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.8);
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2);
+      font-size: 18px;
+    }
+      </style>
 </head>
 <body>
   <div id="controls">
@@ -92,10 +92,8 @@ button {
 
     const pawnGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.6, 32);
     
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-const cube = new THREE.Mesh(geometry, material);
-scene.add(cube);
+    camera.position.set(0, 10, 14);
+    camera.lookAt(0, 0, 0);
 
 
     let tankModel;
@@ -106,7 +104,7 @@ scene.add(cube);
       'gift/scene.gltf',
       (gltf) => {
         tankModel = gltf.scene;
-        tankModel.scale.set(0.1, 0.1, 0.1);
+        tankModel.scale.set(0.1, 0.1, 0.1); // Adjust scale as needed
         resolve();
       },
       undefined,
@@ -125,27 +123,27 @@ scene.add(cube);
     const highlightMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.5 });
 
     function createSquare(i, j) {
-      const geometry = new THREE.BoxGeometry(squareSize, 0.1, squareSize);
-      const material = new THREE.MeshPhongMaterial({
-        color: (i + j) % 2 === 0 ? 0xecf0f1 : 0x34495e,
-        shininess: 30,
-      });
-      const square = new THREE.Mesh(geometry, material);
-      square.position.set(i - boardWidth / 2 + 0.5, 0, j - boardHeight / 2 + 0.5);
-      return square;
-    }
+  const geometry = new THREE.BoxGeometry(squareSize, 0.1, squareSize);
+  const material = new THREE.MeshPhongMaterial({
+    color: (i + j) % 2 === 0 ? 0xecf0f1 : 0x34495e,
+    shininess: 30,
+  });
+  const square = new THREE.Mesh(geometry, material);
+  square.position.set(i * squareSize, 0, j * squareSize);
+  return square;
+}
 
-    function createPiece(geometry, material, x, z, type, color) {
+function createPiece(geometry, material, x, z, type, color) {
   let piece;
   if (type === 'rook') {
     piece = tankModel.clone();
-    piece.position.y = 0.15; 
+    piece.position.y = 0.15;
   } else {
     piece = new THREE.Mesh(geometry, material);
   }
-piece.position.set(x - boardWidth / 2 + 0.5, piece.geometry.boundingSphere.radius, z - boardHeight / 2 + 0.5);
-   if (type === 'rook' && color === 'black') {
-    piece.rotation.y = Math.PI; 
+  piece.position.set(x * squareSize, piece.position.y, z * squareSize);
+  if (type === 'rook' && color === 'black') {
+    piece.rotation.y = Math.PI;
   }
   piece.userData = { type, color, x, z };
   return piece;
@@ -156,14 +154,14 @@ piece.position.set(x - boardWidth / 2 + 0.5, piece.geometry.boundingSphere.radiu
   await loadTankModel(); // Load the tank model before setting up pieces
 
   const setupOrder = [
-    { geo: null, type: 'rook' }, 
+    { geo: null, type: 'rook' }, // Use null for rook (tank) geometry
     { geo: knightGeometry, type: 'knight' },
     { geo: bishopGeometry, type: 'bishop' },
     { geo: queenGeometry, type: 'queen' },
     { geo: kingGeometry, type: 'king' },
     { geo: bishopGeometry, type: 'bishop' },
     { geo: knightGeometry, type: 'knight' },
-    { geo: null, type: 'rook' } 
+    { geo: null, type: 'rook' } // Use null for rook (tank) geometry
   ];
 
   for (let i = 0; i < 8; i++) {
@@ -279,7 +277,22 @@ piece.position.set(x - boardWidth / 2 + 0.5, piece.geometry.boundingSphere.radiu
       }
     }
 
-
+    function showPossibleMoves(piece) {
+      clearHighlights();
+      for (let x = 0; x < 8; x++) {
+        for (let z = 0; z < 8; z++) {
+          if (isValidMove(piece, x, z)) {
+            const highlight = new THREE.Mesh(
+              new THREE.BoxGeometry(squareSize, 0.1, squareSize),
+              highlightMaterial
+            );
+            highlight.position.set(x - boardWidth / 2 + 0.5, 0.05, z - boardHeight / 2 + 0.5);
+            boardGroup.add(highlight);
+            highlightedSquares.push(highlight);
+          }
+        }
+      }
+    }
 
     function clearHighlights() {
       highlightedSquares.forEach(highlight => boardGroup.remove(highlight));
@@ -342,7 +355,15 @@ piece.position.set(x - boardWidth / 2 + 0.5, piece.geometry.boundingSphere.radiu
 
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(pieces);
+      if (boardIntersects.length > 0) {
+    const newPosition = boardIntersects[0].point;
+    const newX = Math.floor((newPosition.x + 4 * squareSize) / squareSize);
+    const newZ = Math.floor((newPosition.z + 4 * squareSize) / squareSize);
 
+    if (isValidMove(selectedPiece, newX, newZ)) {
+      movePiece(selectedPiece, newX, newZ);
+    }
+  }
       if (intersects.length > 0 && intersects[0].object.userData.color === currentTurn) {
         if (selectedPiece) {
           selectedPiece.position.y -= 0.2;
@@ -383,6 +404,11 @@ piece.position.set(x - boardWidth / 2 + 0.5, piece.geometry.boundingSphere.radiu
     }
   }
 
+  await setupChessPieces();
+  scene.add(boardGroup);
+
+ 
+  boardGroup.position.set(-3.5 * squareSize, 0, -3.5 * squareSize);
   await setupChessPieces();
   scene.add(boardGroup);
 
