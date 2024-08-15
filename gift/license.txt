@@ -1,0 +1,11 @@
+Model Information:
+* title:	Mini Tank
+* source:	https://sketchfab.com/3d-models/mini-tank-2e246a8afb0149909ce35dd112a715b7
+* author:	Stormy (https://sketchfab.com/stormycube)
+
+Model License:
+* license type:	CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
+* requirements:	Author must be credited. No commercial use.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Mini Tank" (https://sketchfab.com/3d-models/mini-tank-2e246a8afb0149909ce35dd112a715b7) by Stormy (https://sketchfab.com/stormycube) licensed under CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
