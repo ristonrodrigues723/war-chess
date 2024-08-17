@@ -82,93 +82,6 @@ function createPiece(geometry, material, x, z, type, color) {
   return piece;
 }
 
-function isKingInCheck(color) {
-  const king = pieces.find(p => p.userData.type === 'king' && p.userData.color === color);
-  return pieces.some(p => p.userData.color !== color && isValidMove(p, king.userData.x, king.userData.z));
-}
-
-function wouldMoveExposeKing(piece, newX, newZ) {
-  const originalX = piece.userData.x;
-  const originalZ = piece.userData.z;
-  const capturedPiece = getPieceAt(newX, newZ);
-  
-  // Temporarily move the piece
-  piece.userData.x = newX;
-  piece.userData.z = newZ;
-  if (capturedPiece) {
-    pieces.splice(pieces.indexOf(capturedPiece), 1);
-  }
-  
-  const kingExposed = isKingInCheck(piece.userData.color);
-  
-  // Revert the move
-  piece.userData.x = originalX;
-  piece.userData.z = originalZ;
-  if (capturedPiece) {
-    pieces.push(capturedPiece);
-  }
-  
-  return kingExposed;
-}
-
-function getAllValidMoves(color) {
-  const validMoves = [];
-  pieces.filter(p => p.userData.color === color).forEach(piece => {
-    for (let x = 0; x < 8; x++) {
-      for (let z = 0; z < 8; z++) {
-        if (isValidMove(piece, x, z) && !isPieceAt(x, z, color) && !wouldMoveExposeKing(piece, x, z)) {
-          validMoves.push({ piece, x, z });
-        }
-      }
-    }
-  });
-  return validMoves;
-}
-
-function evaluateMove(move) {
-  let score = 0;
-  const { piece, x, z } = move;
-  
- 
-  const pieceValues = {
-    pawn: 1,
-    knight: 3,
-    bishop: 3,
-    rook: 5,
-    queen: 9,
-    king: 0
-  };
-  
-
-  const capturedPiece = getPieceAt(x, z);
-  if (capturedPiece) {
-    score += pieceValues[capturedPiece.userData.type];
-  }
-  
-
-  pieces.filter(p => p.userData.color === piece.userData.color).forEach(p => {
-    if (isValidMove(piece, p.userData.x, p.userData.z)) {
-      score += pieceValues[p.userData.type] * 0.1;
-    }
-  });
-  
-
-  if ((x === 3 || x === 4) && (z === 3 || z === 4)) {
-    score += 0.5;
-  }
-  
-
-  if (piece.userData.type === 'king') {
-    if (z === 7) {
-      score += 1;
-    } else {
-      score -= 1;
-    }
-  }
-  
-  return score;
-}
-
     const pieces = [];
     function setupChessPieces() {
       const setupOrder = [
@@ -233,75 +146,30 @@ function evaluateMove(move) {
     const highlightedSquares = [];
 
     function isValidMove(piece, newX, newZ) {
-  const dx = newX - piece.userData.x;
-  const dz = newZ - piece.userData.z;
-  const adx = Math.abs(dx);
-  const adz = Math.abs(dz);
+      const dx = Math.abs(newX - piece.userData.x);
+      const dz = Math.abs(newZ - piece.userData.z);
 
-  if (isPieceAt(newX, newZ, piece.userData.color)) {
-    return false;
-  }
-
-  switch (piece.userData.type) {
-    case 'pawn':
-    case 'pawn':
-      if (piece.userData.color === 'white') {
-        if (dx === 0 && dz === 1 && !isPieceAt(newX, newZ)) {
-          return true;
-        }
-        if (dx === 0 && dz === 2 && piece.userData.z === 1 && !isPieceAt(newX, newZ) && !isPieceAt(newX, newZ - 1)) {
-          return true;
-        }
-        if (adx === 1 && dz === 1 && isPieceAt(newX, newZ, 'black')) {
-          return true;
-        }
-      } else {
-        if (dx === 0 && dz === -1 && !isPieceAt(newX, newZ)) {
-          return true;
-        }
-        if (dx === 0 && dz === -2 && piece.userData.z === 6 && !isPieceAt(newX, newZ) && !isPieceAt(newX, newZ + 1)) {
-          return true;
-        }
-        if (adx === 1 && dz === -1 && isPieceAt(newX, newZ, 'white')) {
-          return true;
-        }
+      switch (piece.userData.type) {
+        case 'pawn':
+          if (piece.userData.color === 'white') {
+            return newX === piece.userData.x && (newZ === piece.userData.z + 1 || (piece.userData.z === 1 && newZ === 3));
+          } else {
+            return newX === piece.userData.x && (newZ === piece.userData.z - 1 || (piece.userData.z === 6 && newZ === 4));
+          }
+        case 'rook':
+          return dx === 0 || dz === 0;
+        case 'knight':
+          return (dx === 1 && dz === 2) || (dx === 2 && dz === 1);
+        case 'bishop':
+          return dx === dz;
+        case 'queen':
+          return dx === dz || dx === 0 || dz === 0;
+        case 'king':
+          return dx <= 1 && dz <= 1;
+        default:
+          return false;
       }
-      return false;
-    case 'rook':
-      return (dx === 0 || dz === 0) && !isPieceBlocking(piece, newX, newZ);
-    case 'knight':
-      return (adx === 1 && adz === 2) || (adx === 2 && adz === 1);
-    case 'bishop':
-      return adx === adz && !isPieceBlocking(piece, newX, newZ);
-    case 'queen':
-      return (dx === 0 || dz === 0 || adx === adz) && !isPieceBlocking(piece, newX, newZ);
-    case 'king':
-      return adx <= 1 && adz <= 1;
-    default:
-      return false;
-  }
-}
-
-
-
-function isPieceBlocking(piece, newX, newZ) {
-  const dx = newX - piece.userData.x;
-  const dz = newZ - piece.userData.z;
-  const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
-  const stepZ = dz === 0 ? 0 : dz > 0 ? 1 : -1;
-  let x = piece.userData.x + stepX;
-  let z = piece.userData.z + stepZ;
-
-  while (x !== newX || z !== newZ) {
-    if (isPieceAt(x, z)) {
-      return true;
     }
-    x += stepX;
-    z += stepZ;
-  }
-
-  return false;
-}
 
     function showPossibleMoves(piece) {
   clearHighlights();
@@ -339,11 +207,6 @@ function isPieceBlocking(piece, newX, newZ) {
   if (capturedPiece) {
     boardGroup.remove(capturedPiece);
     pieces.splice(pieces.indexOf(capturedPiece), 1);
-
-    if (capturedPiece.userData.type === 'king') {
-      endGame(piece.userData.color);
-      return;
-    }
   }
 
   piece.position.x = (newX - boardWidth / 2 + 0.5) * 2;
@@ -357,37 +220,25 @@ function isPieceBlocking(piece, newX, newZ) {
   }
 }
 
-function endGame(winningColor) {
-  alert(`Game Over! ${winningColor.charAt(0).toUpperCase() + winningColor.slice(1)} wins!`);
+    function makeAIMove() {
+      const blackPieces = pieces.filter(p => p.userData.color === 'black');
+      const validMoves = [];
 
-}
-function makeAIMove() {
-  const validMoves = getAllValidMoves('black');
-  
-  if (validMoves.length === 0) {
-    if (isKingInCheck('black')) {
-      console.log("Checkmate! White wins!");
-    } else {
-      console.log("Stalemate!");
+      blackPieces.forEach(piece => {
+        for (let x = 0; x < 8; x++) {
+          for (let z = 0; z < 8; z++) {
+            if (isValidMove(piece, x, z) && !isPieceAt(x, z, 'black')) {
+              validMoves.push({ piece, x, z });
+            }
+          }
+        }
+      });
+
+      if (validMoves.length > 0) {
+        const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+        movePiece(randomMove.piece, randomMove.x, randomMove.z);
+      }
     }
-    return;
-  }
-  
-  let bestMove = null;
-  let bestScore = -Infinity;
-  
-  validMoves.forEach(move => {
-    const score = evaluateMove(move);
-    if (score > bestScore) {
-      bestScore = score;
-      bestMove = move;
-    }
-  });
-  
-  if (bestMove) {
-    movePiece(bestMove.piece, bestMove.x, bestMove.z);
-  }
-}
 
     function onMouseDown(event) {
   event.preventDefault();

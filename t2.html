@@ -52,12 +52,40 @@
     const squareSize = 2; 
     const boardGroup = new THREE.Group();
 
-    const pawnGeometry = new THREE.CylinderGeometry(0.4, 0.4, 1.2, 32);
-const rookGeometry = new THREE.BoxGeometry(0.8, 1.2, 0.8);
-const knightGeometry = new THREE.ConeGeometry(0.6, 1.4, 32);
-const bishopGeometry = new THREE.ConeGeometry(0.6, 1.6, 32);
-const queenGeometry = new THREE.SphereGeometry(0.8, 32, 32);
-const kingGeometry = new THREE.CylinderGeometry(0.6, 0.6, 1.8, 32);
+    const pawnGeometry = new THREE.CylinderGeometry(0.3, 0.4, 1.2, 32);
+const rookGeometry = new THREE.Group();
+const tankBody = new THREE.BoxGeometry(0.8, 0.6, 1.2);
+const tankTurret = new THREE.CylinderGeometry(0.3, 0.3, 0.8, 16);
+const tankGun = new THREE.CylinderGeometry(0.1, 0.1, 0.6, 16);
+rookGeometry.add(
+  new THREE.Mesh(tankBody),
+  new THREE.Mesh(tankTurret).translateY(0.3).translateZ(-0.2),
+  new THREE.Mesh(tankGun).rotateX(Math.PI / 2).translateY(0.4).translateZ(-0.7)
+);
+const knightGeometry = new THREE.Group();
+const horseHead = new THREE.ConeGeometry(0.3, 0.8, 32);
+const horseBody = new THREE.BoxGeometry(0.6, 0.6, 0.8);
+knightGeometry.add(
+  new THREE.Mesh(horseHead).rotateX(-Math.PI / 4).translateY(0.6).translateZ(-0.2),
+  new THREE.Mesh(horseBody).translateY(0.3)
+);
+const bishopGeometry = new THREE.ConeGeometry(0.5, 1.6, 32);
+const queenGeometry = new THREE.Group();
+const queenBody = new THREE.ConeGeometry(0.6, 1.6, 32);
+const queenCrown = new THREE.TorusGeometry(0.3, 0.1, 16, 32);
+queenGeometry.add(
+  new THREE.Mesh(queenBody),
+  new THREE.Mesh(queenCrown).rotateX(Math.PI / 2).translateY(0.8)
+);
+const kingGeometry = new THREE.Group();
+const kingBody = new THREE.CylinderGeometry(0.5, 0.5, 1.6, 32);
+const kingHead = new THREE.SphereGeometry(0.3, 32, 32);
+const kingTie = new THREE.BoxGeometry(0.2, 0.6, 0.1);
+kingGeometry.add(
+  new THREE.Mesh(kingBody),
+  new THREE.Mesh(kingHead).translateY(0.9),
+  new THREE.Mesh(kingTie).rotateX(Math.PI / 6).translateY(0.5).translateZ(0.25)
+);
 
     const whiteMaterial = new THREE.MeshPhongMaterial({ color: 0xFFFFFF });
     const blackMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
@@ -76,10 +104,71 @@ const kingGeometry = new THREE.CylinderGeometry(0.6, 0.6, 1.8, 32);
 }
 
 function createPiece(geometry, material, x, z, type, color) {
-  const piece = new THREE.Mesh(geometry, material);
+  let piece;
+  if (geometry.isGroup) {
+    piece = geometry.clone();
+    piece.children.forEach(child => child.material = material.clone());
+  } else {
+    piece = new THREE.Mesh(geometry, material.clone());
+  }
   piece.position.set((x - boardWidth / 2 + 0.5) * 2, 0.6, (z - boardHeight / 2 + 0.5) * 2);
   piece.userData = { type, color, x, z };
   return piece;
+}
+
+function movePiece(piece, newX, newZ) {
+  const capturedPiece = getPieceAt(newX, newZ);
+  if (capturedPiece) {
+    boardGroup.remove(capturedPiece);
+    pieces.splice(pieces.indexOf(capturedPiece), 1);
+  }
+
+  piece.position.x = (newX - boardWidth / 2 + 0.5) * 2;
+  piece.position.z = (newZ - boardHeight / 2 + 0.5) * 2;
+  piece.userData.x = newX;
+  piece.userData.z = newZ;
+
+  currentTurn = currentTurn === 'white' ? 'black' : 'white';
+  if (currentTurn === 'black') {
+    setTimeout(makeAIMove, 500);
+  }
+}
+
+function onMouseDown(event) {
+  event.preventDefault();
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(pieces, true);
+
+  if (intersects.length > 0) {
+    const clickedObject = intersects[0].object;
+    const clickedPiece = clickedObject.parent.type === 'Group' ? clickedObject.parent : clickedObject;
+    
+    if (clickedPiece.userData.color === currentTurn) {
+      if (selectedPiece) {
+        selectedPiece.position.y -= 0.4;
+      }
+      selectedPiece = clickedPiece;
+      selectedPiece.position.y += 0.4;
+      showPossibleMoves(selectedPiece);
+    }
+  } else if (selectedPiece) {
+    const boardIntersects = raycaster.intersectObjects(boardGroup.children.filter(child => child.geometry.type === 'BoxGeometry'));
+    if (boardIntersects.length > 0) {
+      const newPosition = boardIntersects[0].point;
+      const newX = Math.round((newPosition.x + boardWidth) / 2 - 0.5);
+      const newZ = Math.round((newPosition.z + boardHeight) / 2 - 0.5);
+
+      if (isValidMove(selectedPiece, newX, newZ) && !isPieceAt(newX, newZ, currentTurn)) {
+        movePiece(selectedPiece, newX, newZ);
+        clearHighlights();
+      }
+      selectedPiece.position.y = 0.6;
+      selectedPiece = null;
+    }
+  }
 }
 
 function isKingInCheck(color) {
@@ -92,7 +181,7 @@ function wouldMoveExposeKing(piece, newX, newZ) {
   const originalZ = piece.userData.z;
   const capturedPiece = getPieceAt(newX, newZ);
   
-  // Temporarily move the piece
+
   piece.userData.x = newX;
   piece.userData.z = newZ;
   if (capturedPiece) {
@@ -129,7 +218,7 @@ function evaluateMove(move) {
   let score = 0;
   const { piece, x, z } = move;
   
- 
+
   const pieceValues = {
     pawn: 1,
     knight: 3,
@@ -139,7 +228,6 @@ function evaluateMove(move) {
     king: 0
   };
   
-
   const capturedPiece = getPieceAt(x, z);
   if (capturedPiece) {
     score += pieceValues[capturedPiece.userData.type];
@@ -152,12 +240,12 @@ function evaluateMove(move) {
     }
   });
   
-
+ 
   if ((x === 3 || x === 4) && (z === 3 || z === 4)) {
     score += 0.5;
   }
   
-
+ 
   if (piece.userData.type === 'king') {
     if (z === 7) {
       score += 1;
@@ -233,75 +321,30 @@ function evaluateMove(move) {
     const highlightedSquares = [];
 
     function isValidMove(piece, newX, newZ) {
-  const dx = newX - piece.userData.x;
-  const dz = newZ - piece.userData.z;
-  const adx = Math.abs(dx);
-  const adz = Math.abs(dz);
+      const dx = Math.abs(newX - piece.userData.x);
+      const dz = Math.abs(newZ - piece.userData.z);
 
-  if (isPieceAt(newX, newZ, piece.userData.color)) {
-    return false;
-  }
-
-  switch (piece.userData.type) {
-    case 'pawn':
-    case 'pawn':
-      if (piece.userData.color === 'white') {
-        if (dx === 0 && dz === 1 && !isPieceAt(newX, newZ)) {
-          return true;
-        }
-        if (dx === 0 && dz === 2 && piece.userData.z === 1 && !isPieceAt(newX, newZ) && !isPieceAt(newX, newZ - 1)) {
-          return true;
-        }
-        if (adx === 1 && dz === 1 && isPieceAt(newX, newZ, 'black')) {
-          return true;
-        }
-      } else {
-        if (dx === 0 && dz === -1 && !isPieceAt(newX, newZ)) {
-          return true;
-        }
-        if (dx === 0 && dz === -2 && piece.userData.z === 6 && !isPieceAt(newX, newZ) && !isPieceAt(newX, newZ + 1)) {
-          return true;
-        }
-        if (adx === 1 && dz === -1 && isPieceAt(newX, newZ, 'white')) {
-          return true;
-        }
+      switch (piece.userData.type) {
+        case 'pawn':
+          if (piece.userData.color === 'white') {
+            return newX === piece.userData.x && (newZ === piece.userData.z + 1 || (piece.userData.z === 1 && newZ === 3));
+          } else {
+            return newX === piece.userData.x && (newZ === piece.userData.z - 1 || (piece.userData.z === 6 && newZ === 4));
+          }
+        case 'rook':
+          return dx === 0 || dz === 0;
+        case 'knight':
+          return (dx === 1 && dz === 2) || (dx === 2 && dz === 1);
+        case 'bishop':
+          return dx === dz;
+        case 'queen':
+          return dx === dz || dx === 0 || dz === 0;
+        case 'king':
+          return dx <= 1 && dz <= 1;
+        default:
+          return false;
       }
-      return false;
-    case 'rook':
-      return (dx === 0 || dz === 0) && !isPieceBlocking(piece, newX, newZ);
-    case 'knight':
-      return (adx === 1 && adz === 2) || (adx === 2 && adz === 1);
-    case 'bishop':
-      return adx === adz && !isPieceBlocking(piece, newX, newZ);
-    case 'queen':
-      return (dx === 0 || dz === 0 || adx === adz) && !isPieceBlocking(piece, newX, newZ);
-    case 'king':
-      return adx <= 1 && adz <= 1;
-    default:
-      return false;
-  }
-}
-
-
-
-function isPieceBlocking(piece, newX, newZ) {
-  const dx = newX - piece.userData.x;
-  const dz = newZ - piece.userData.z;
-  const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
-  const stepZ = dz === 0 ? 0 : dz > 0 ? 1 : -1;
-  let x = piece.userData.x + stepX;
-  let z = piece.userData.z + stepZ;
-
-  while (x !== newX || z !== newZ) {
-    if (isPieceAt(x, z)) {
-      return true;
     }
-    x += stepX;
-    z += stepZ;
-  }
-
-  return false;
-}
 
     function showPossibleMoves(piece) {
   clearHighlights();
@@ -334,93 +377,29 @@ function isPieceBlocking(piece, newX, newZ) {
       return pieces.find(p => p.userData.x === x && p.userData.z === z);
     }
 
-    function movePiece(piece, newX, newZ) {
-  const capturedPiece = getPieceAt(newX, newZ);
-  if (capturedPiece) {
-    boardGroup.remove(capturedPiece);
-    pieces.splice(pieces.indexOf(capturedPiece), 1);
 
-    if (capturedPiece.userData.type === 'king') {
-      endGame(piece.userData.color);
-      return;
-    }
-  }
+    function makeAIMove() {
+      const blackPieces = pieces.filter(p => p.userData.color === 'black');
+      const validMoves = [];
 
-  piece.position.x = (newX - boardWidth / 2 + 0.5) * 2;
-  piece.position.z = (newZ - boardHeight / 2 + 0.5) * 2;
-  piece.userData.x = newX;
-  piece.userData.z = newZ;
+      blackPieces.forEach(piece => {
+        for (let x = 0; x < 8; x++) {
+          for (let z = 0; z < 8; z++) {
+            if (isValidMove(piece, x, z) && !isPieceAt(x, z, 'black')) {
+              validMoves.push({ piece, x, z });
+            }
+          }
+        }
+      });
 
-  currentTurn = currentTurn === 'white' ? 'black' : 'white';
-  if (currentTurn === 'black') {
-    setTimeout(makeAIMove, 500);
-  }
-}
-
-function endGame(winningColor) {
-  alert(`Game Over! ${winningColor.charAt(0).toUpperCase() + winningColor.slice(1)} wins!`);
-
-}
-function makeAIMove() {
-  const validMoves = getAllValidMoves('black');
-  
-  if (validMoves.length === 0) {
-    if (isKingInCheck('black')) {
-      console.log("Checkmate! White wins!");
-    } else {
-      console.log("Stalemate!");
-    }
-    return;
-  }
-  
-  let bestMove = null;
-  let bestScore = -Infinity;
-  
-  validMoves.forEach(move => {
-    const score = evaluateMove(move);
-    if (score > bestScore) {
-      bestScore = score;
-      bestMove = move;
-    }
-  });
-  
-  if (bestMove) {
-    movePiece(bestMove.piece, bestMove.x, bestMove.z);
-  }
-}
-
-    function onMouseDown(event) {
-  event.preventDefault();
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-  raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects(pieces);
-
-  if (intersects.length > 0 && intersects[0].object.userData.color === currentTurn) {
-    if (selectedPiece) {
-      selectedPiece.position.y -= 0.4; // Changed from 0.2 to 0.4
-    }
-    selectedPiece = intersects[0].object;
-    selectedPiece.position.y += 0.4; // Changed from 0.2 to 0.4
-    showPossibleMoves(selectedPiece);
-  } else if (selectedPiece) {
-    const boardIntersects = raycaster.intersectObjects(boardGroup.children.filter(child => child.geometry.type === 'BoxGeometry'));
-    if (boardIntersects.length > 0) {
-      const newPosition = boardIntersects[0].point;
-      const newX = Math.round((newPosition.x + boardWidth) / 2 - 0.5);
-      const newZ = Math.round((newPosition.z + boardHeight) / 2 - 0.5);
-
-      if (isValidMove(selectedPiece, newX, newZ) && !isPieceAt(newX, newZ, currentTurn)) {
-        movePiece(selectedPiece, newX, newZ);
-        clearHighlights();
+      if (validMoves.length > 0) {
+        const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+        movePiece(randomMove.piece, randomMove.x, randomMove.z);
       }
-      selectedPiece.position.y = 0.6; // Changed from 0.3 to 0.6
-      selectedPiece = null;
     }
-  }
-}
-    function animate() {
+
+
+function animate() {
       requestAnimationFrame(animate);
       renderer.render(scene, camera);
     }
