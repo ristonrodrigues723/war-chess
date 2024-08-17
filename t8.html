@@ -74,11 +74,12 @@ const kingGeometry = new THREE.CylinderGeometry(0.6, 0.6, 1.8, 32);
   square.position.multiplyScalar(2); // Scale position
   return square;
 }
+
 function isPieceBlocking(piece, newX, newZ) {
   const dx = newX - piece.userData.x;
   const dz = newZ - piece.userData.z;
-  const stepX = Math.sign(dx);
-  const stepZ = Math.sign(dz);
+  const stepX = dx !== 0 ? Math.sign(dx) : 0;
+  const stepZ = dz !== 0 ? Math.sign(dz) : 0;
   let x = piece.userData.x + stepX;
   let z = piece.userData.z + stepZ;
 
@@ -92,12 +93,17 @@ function isPieceBlocking(piece, newX, newZ) {
 
   return false;
 }
+
+
+
 function createPiece(geometry, material, x, z, type, color) {
   const piece = new THREE.Mesh(geometry, material);
   piece.position.set((x - boardWidth / 2 + 0.5) * 2, 0.6, (z - boardHeight / 2 + 0.5) * 2);
   piece.userData = { type, color, x, z };
   return piece;
 }
+
+
 function isValidMove(piece, newX, newZ) {
   const dx = newX - piece.userData.x;
   const dz = newZ - piece.userData.z;
@@ -134,6 +140,43 @@ function isValidMove(piece, newX, newZ) {
       return false;
   }
 }
+
+
+  const dx = newX - piece.userData.x;
+  const dz = newZ - piece.userData.z;
+  const adx = Math.abs(dx);
+  const adz = Math.abs(dz);
+
+  if (isPieceAt(newX, newZ, piece.userData.color)) {
+    return false;
+  }
+
+  switch (piece.userData.type) {
+    case 'pawn':
+      if (piece.userData.color === 'white') {
+        if (dx === 0 && dz === 1 && !isPieceAt(newX, newZ)) return true;
+        if (dx === 0 && dz === 2 && piece.userData.z === 1 && !isPieceAt(newX, newZ) && !isPieceAt(newX, newZ - 1)) return true;
+        if (adx === 1 && dz === 1 && isPieceAt(newX, newZ, 'black')) return true;
+      } else {
+        if (dx === 0 && dz === -1 && !isPieceAt(newX, newZ)) return true;
+        if (dx === 0 && dz === -2 && piece.userData.z === 6 && !isPieceAt(newX, newZ) && !isPieceAt(newX, newZ + 1)) return true;
+        if (adx === 1 && dz === -1 && isPieceAt(newX, newZ, 'white')) return true;
+      }
+      return false;
+    case 'rook':
+      return (dx === 0 || dz === 0) && !isPieceBlocking(piece, newX, newZ);
+    case 'knight':
+      return (adx === 1 && adz === 2) || (adx === 2 && adz === 1);
+    case 'bishop':
+      return adx === adz && !isPieceBlocking(piece, newX, newZ);
+    case 'queen':
+      return (dx === 0 || dz === 0 || adx === adz) && !isPieceBlocking(piece, newX, newZ);
+    case 'king':
+      return adx <= 1 && adz <= 1;
+    default:
+      return false;
+  }
+
 function isKingInCheck(color) {
   const king = pieces.find(p => p.userData.type === 'king' && p.userData.color === color);
   return pieces.some(p => p.userData.color !== color && isValidMove(p, king.userData.x, king.userData.z));
@@ -168,7 +211,7 @@ function getAllValidMoves(color) {
   pieces.filter(p => p.userData.color === color).forEach(piece => {
     for (let x = 0; x < 8; x++) {
       for (let z = 0; z < 8; z++) {
-        if (isValidMove(piece, x, z) && !isPieceAt(x, z, color) && !wouldMoveExposeKing(piece, x, z)) {
+        if (isValidMove(piece, x, z) && !wouldMoveExposeKing(piece, x, z)) {
           validMoves.push({ piece, x, z });
         }
       }
@@ -306,6 +349,42 @@ function evaluateMove(move) {
   }
 }
 
+function makeAIMove() {
+  const validMoves = getAllValidMoves('black');
+  
+  if (validMoves.length === 0) {
+    if (isKingInCheck('black')) {
+      console.log("Checkmate! White wins!");
+    } else {
+      console.log("Stalemate!");
+    }
+    return;
+  }
+  
+  let bestMove = null;
+  let bestScore = -Infinity;
+  
+  validMoves.forEach(move => {
+    const score = evaluateMove(move);
+    if (score > bestScore) {
+      bestScore = score;
+      bestMove = move;
+    }
+  });
+  
+  if (bestMove) {
+    if (isValidMove(bestMove.piece, bestMove.x, bestMove.z)) {
+      movePiece(bestMove.piece, bestMove.x, bestMove.z);
+    } else {
+      console.error("AI attempted an invalid move:", bestMove);
+      // Fallback to a random valid move
+      const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+      movePiece(randomMove.piece, randomMove.x, randomMove.z);
+    }
+  }
+}
+
+
     function clearHighlights() {
       highlightedSquares.forEach(highlight => boardGroup.remove(highlight));
       highlightedSquares.length = 0;
@@ -350,7 +429,8 @@ function endGame(winningColor) {
   alert(`Game Over! ${winningColor.charAt(0).toUpperCase() + winningColor.slice(1)} wins!`);
 
 }
-function makeAIMove() {
+
+
   const validMoves = getAllValidMoves('black');
   
   if (validMoves.length === 0) {
@@ -376,7 +456,7 @@ function makeAIMove() {
   if (bestMove) {
     movePiece(bestMove.piece, bestMove.x, bestMove.z);
   }
-}
+
 
     function onMouseDown(event) {
   event.preventDefault();
