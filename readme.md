@@ -1,1 +1,1 @@
-its a 3d war chess made using 3.js inspired by the war chess games played on pc in the past only differnce is it uses(planned) morden pieces like tanks artilery ,plane and such-https://ristonrodrigues723.github.io/war-chess/
+its a 3d war chess made using 3.js inspired by the war chess games played on pc in the past only differnce is it uses(planned) morden pieces like tanks artilery ,plane and such-https://ristonrodrigues723.github.io/war-chess/, click o pieces of white to play the black should be played by code itself
