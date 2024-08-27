@@ -3,33 +3,39 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive Chessboard with AI</title>
+  <title>Interactive 3D Chessboard with AI</title>
   <style>
-    body { margin: 0; background-color: #2c3e50; }
+    body { margin: 0; background-color: #2c3e50; font-family: Arial, sans-serif; }
     canvas { display: block; }
     #controls {
       position: absolute;
       top: 10px;
       left: 10px;
-      background: rgba(255, 255, 255, 0.7);
-      padding: 10px;
-      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
     }
     button {
       background-color: #3498db;
       border: none;
       color: white;
-      padding: 5px 10px;
+      padding: 8px 15px;
       text-align: center;
       text-decoration: none;
       display: inline-block;
       font-size: 14px;
-      margin: 2px 2px;
+      margin: 4px 2px;
       cursor: pointer;
-      border-radius: 3px;
+      border-radius: 4px;
+      transition: background-color 0.3s;
     }
     button:hover {
       background-color: #2980b9;
+    }
+    #turnIndicator {
+      margin-top: 10px;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -37,8 +43,11 @@
   <div id="controls">
     <button id="zoomInBtn">Zoom In</button>
     <button id="zoomOutBtn">Zoom Out</button>
+    <button id="resetViewBtn">Reset View</button>
+    <div id="turnIndicator">Current Turn: White</div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.js"></script>
   <script>
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -49,125 +58,41 @@
 
     const boardWidth = 8;
     const boardHeight = 8;
-    const squareSize = 2; 
+    const squareSize = 2;
     const boardGroup = new THREE.Group();
 
-    const pawnGeometry = new THREE.CylinderGeometry(0.4, 0.4, 1.2, 32);
-const rookGeometry = new THREE.BoxGeometry(0.8, 1.2, 0.8);
-const knightGeometry = new THREE.ConeGeometry(0.6, 1.4, 32);
-const bishopGeometry = new THREE.ConeGeometry(0.6, 1.6, 32);
-const queenGeometry = new THREE.SphereGeometry(0.8, 32, 32);
-const kingGeometry = new THREE.CylinderGeometry(0.6, 0.6, 1.8, 32);
+    const pawnGeometry = new THREE.LatheGeometry(
+      [new THREE.Vector2(0, 0), new THREE.Vector2(0.3, 0), new THREE.Vector2(0.25, 0.4), new THREE.Vector2(0.3, 0.6), new THREE.Vector2(0.1, 1.2)],
+      32
+    );
+    const rookGeometry = new THREE.CylinderGeometry(0.3, 0.4, 1.2, 32);
+    const knightGeometry = new THREE.TorusKnotGeometry(0.3, 0.1, 64, 8);
+    const bishopGeometry = new THREE.ConeGeometry(0.4, 1.6, 32);
+    const queenGeometry = new THREE.SphereGeometry(0.5, 32, 32);
+    const kingGeometry = new THREE.CylinderGeometry(0.4, 0.4, 1.8, 32);
 
-    const whiteMaterial = new THREE.MeshPhongMaterial({ color: 0xFFFFFF });
-    const blackMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
-    const highlightMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.5 });
+    const whiteMaterial = new THREE.MeshPhongMaterial({ color: 0xFFFFFF, shininess: 100 });
+    const blackMaterial = new THREE.MeshPhongMaterial({ color: 0x222222, shininess: 100 });
+    const highlightMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.3 });
 
     function createSquare(i, j) {
-  const geometry = new THREE.BoxGeometry(squareSize, 0.2, squareSize);
-  const material = new THREE.MeshPhongMaterial({
-    color: (i + j) % 2 === 0 ? 0xecf0f1 : 0x34495e,
-    shininess: 30,
-  });
-  const square = new THREE.Mesh(geometry, material);
-  square.position.set(i - boardWidth / 2 + 0.5, 0, j - boardHeight / 2 + 0.5);
-  square.position.multiplyScalar(2); // Scale position
-  return square;
-}
-
-function createPiece(geometry, material, x, z, type, color) {
-  const piece = new THREE.Mesh(geometry, material);
-  piece.position.set((x - boardWidth / 2 + 0.5) * 2, 0.6, (z - boardHeight / 2 + 0.5) * 2);
-  piece.userData = { type, color, x, z };
-  return piece;
-}
-
-function isKingInCheck(color) {
-  const king = pieces.find(p => p.userData.type === 'king' && p.userData.color === color);
-  return pieces.some(p => p.userData.color !== color && isValidMove(p, king.userData.x, king.userData.z));
-}
-
-function wouldMoveExposeKing(piece, newX, newZ) {
-  const originalX = piece.userData.x;
-  const originalZ = piece.userData.z;
-  const capturedPiece = getPieceAt(newX, newZ);
-  
-  // Temporarily move the piece
-  piece.userData.x = newX;
-  piece.userData.z = newZ;
-  if (capturedPiece) {
-    pieces.splice(pieces.indexOf(capturedPiece), 1);
-  }
-  
-  const kingExposed = isKingInCheck(piece.userData.color);
-  
-  // Revert the move
-  piece.userData.x = originalX;
-  piece.userData.z = originalZ;
-  if (capturedPiece) {
-    pieces.push(capturedPiece);
-  }
-  
-  return kingExposed;
-}
-
-function getAllValidMoves(color) {
-  const validMoves = [];
-  pieces.filter(p => p.userData.color === color).forEach(piece => {
-    for (let x = 0; x < 8; x++) {
-      for (let z = 0; z < 8; z++) {
-        if (isValidMove(piece, x, z) && !isPieceAt(x, z, color) && !wouldMoveExposeKing(piece, x, z)) {
-          validMoves.push({ piece, x, z });
-        }
-      }
+      const geometry = new THREE.BoxGeometry(squareSize, 0.2, squareSize);
+      const material = new THREE.MeshPhongMaterial({
+        color: (i + j) % 2 === 0 ? 0xecf0f1 : 0x34495e,
+        shininess: 30,
+      });
+      const square = new THREE.Mesh(geometry, material);
+      square.position.set(i - boardWidth / 2 + 0.5, 0, j - boardHeight / 2 + 0.5);
+      square.position.multiplyScalar(2);
+      return square;
     }
-  });
-  return validMoves;
-}
 
-function evaluateMove(move) {
-  let score = 0;
-  const { piece, x, z } = move;
-  
- 
-  const pieceValues = {
-    pawn: 1,
-    knight: 3,
-    bishop: 3,
-    rook: 5,
-    queen: 9,
-    king: 0
-  };
-  
-
-  const capturedPiece = getPieceAt(x, z);
-  if (capturedPiece) {
-    score += pieceValues[capturedPiece.userData.type];
-  }
-  
-
-  pieces.filter(p => p.userData.color === piece.userData.color).forEach(p => {
-    if (isValidMove(piece, p.userData.x, p.userData.z)) {
-      score += pieceValues[p.userData.type] * 0.1;
+    function createPiece(geometry, material, x, z, type, color) {
+      const piece = new THREE.Mesh(geometry, material);
+      piece.position.set((x - boardWidth / 2 + 0.5) * 2, 0.6, (z - boardHeight / 2 + 0.5) * 2);
+      piece.userData = { type, color, x, z };
+      return piece;
     }
-  });
-  
-
-  if ((x === 3 || x === 4) && (z === 3 || z === 4)) {
-    score += 0.5;
-  }
-  
-
-  if (piece.userData.type === 'king') {
-    if (z === 7) {
-      score += 1;
-    } else {
-      score -= 1;
-    }
-  }
-  
-  return score;
-}
 
     const pieces = [];
     function setupChessPieces() {
@@ -201,29 +126,33 @@ function evaluateMove(move) {
     setupChessPieces();
     scene.add(boardGroup);
 
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
     scene.add(ambientLight);
 
-    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.5);
-    directionalLight1.position.set(5, 5, 5);
+    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.7);
+    directionalLight1.position.set(5, 10, 5);
     scene.add(directionalLight1);
 
-    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
-    directionalLight2.position.set(-5, 5, -5);
+    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight2.position.set(-5, 10, -5);
     scene.add(directionalLight2);
 
     camera.position.set(0, 14, 20);
     camera.lookAt(0, 0, 0);
 
-    function zoom(delta) {
-  const zoomSpeed = 1; 
-  camera.position.z += delta * zoomSpeed;
-  camera.position.z = Math.max(10, Math.min(40, camera.position.z)); // Adjusted min and max zoom
-  camera.updateProjectionMatrix();
-}
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.screenSpacePanning = false;
+    controls.minDistance = 10;
+    controls.maxDistance = 40;
+    controls.maxPolarAngle = Math.PI / 2;
 
-    function onMouseWheel(event) {
-      zoom(event.deltaY > 0 ? 1 : -1);
+    function zoom(delta) {
+      const zoomSpeed = 1;
+      camera.position.z += delta * zoomSpeed;
+      camera.position.z = Math.max(10, Math.min(40, camera.position.z));
+      camera.updateProjectionMatrix();
     }
 
     let selectedPiece = null;
@@ -232,122 +161,49 @@ function evaluateMove(move) {
     let currentTurn = 'white';
     const highlightedSquares = [];
 
-
-
     function isValidMove(piece, newX, newZ) {
-  const dx = newX - piece.userData.x;
-  const dz = newZ - piece.userData.z;
-  const adx = Math.abs(dx);
-  const adz = Math.abs(dz);
+      const dx = Math.abs(newX - piece.userData.x);
+      const dz = Math.abs(newZ - piece.userData.z);
 
-  if (isPieceAt(newX, newZ, piece.userData.color)) {
-    return false;
-  }
-
-  switch (piece.userData.type) {
-    case 'pawn':
-      if (piece.userData.color === 'white') {
-        if (dx === 0 && dz === 1 && !isPieceAt(newX, newZ)) {
-          return true;
-        }
-        if (dx === 0 && dz === 2 && piece.userData.z === 1 && !isPieceAt(newX, newZ) && !isPieceAt(newX, newZ - 1)) {
-          return true;
-        }
-        if (adx === 1 && dz === 1 && isPieceAt(newX, newZ, 'black')) {
-          return true;
-        }
-      } else {
-        if (dx === 0 && dz === -1 && !isPieceAt(newX, newZ)) {
-          return true;
-        }
-        if (dx === 0 && dz === -2 && piece.userData.z === 6 && !isPieceAt(newX, newZ) && !isPieceAt(newX, newZ + 1)) {
-          return true;
-        }
-        if (adx === 1 && dz === -1 && isPieceAt(newX, newZ, 'white')) {
-          return true;
-        }
+      switch (piece.userData.type) {
+        case 'pawn':
+          if (piece.userData.color === 'white') {
+            return newX === piece.userData.x && (newZ === piece.userData.z + 1 || (piece.userData.z === 1 && newZ === 3));
+          } else {
+            return newX === piece.userData.x && (newZ === piece.userData.z - 1 || (piece.userData.z === 6 && newZ === 4));
+          }
+        case 'rook':
+          return dx === 0 || dz === 0;
+        case 'knight':
+          return (dx === 1 && dz === 2) || (dx === 2 && dz === 1);
+        case 'bishop':
+          return dx === dz;
+        case 'queen':
+          return dx === dz || dx === 0 || dz === 0;
+        case 'king':
+          return dx <= 1 && dz <= 1;
+        default:
+          return false;
       }
-      return false;
-
-    case 'rook':
-      return (dx === 0 || dz === 0) && !isPieceBlocking(piece, newX, newZ);
-
-    case 'knight':
-      return (adx === 1 && adz === 2) || (adx === 2 && adz === 1);
-
-    case 'bishop':
-      return adx === adz && !isPieceBlocking(piece, newX, newZ);
-
-    case 'queen':
-      return (dx === 0 || dz === 0 || adx === adz) && !isPieceBlocking(piece, newX, newZ);
-
-    case 'king':
-      return adx <= 1 && adz <= 1;
-
-    default:
-      return false;
-  }
-}
-
-function isPieceBlocking(piece, newX, newZ) {
-  const dx = newX - piece.userData.x;
-  const dz = newZ - piece.userData.z;
-  const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
-  const stepZ = dz === 0 ? 0 : dz > 0 ? 1 : -1;
-  let x = piece.userData.x + stepX;
-  let z = piece.userData.z + stepZ;
-
-  while (x !== newX || z !== newZ) {
-    if (isPieceAt(x, z)) {
-      return true;
     }
-    x += stepX;
-    z += stepZ;
-  }
-
-  return false;
-}
-
-function isPieceAt(x, z, color) {
-  return pieces.some(p => p.userData.x === x && p.userData.z === z && (!color || p.userData.color === color));
-}
-
-function isPieceBlocking(piece, newX, newZ) {
-  const dx = newX - piece.userData.x;
-  const dz = newZ - piece.userData.z;
-  const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
-  const stepZ = dz === 0 ? 0 : dz > 0 ? 1 : -1;
-  let x = piece.userData.x + stepX;
-  let z = piece.userData.z + stepZ;
-
-  while (x !== newX || z !== newZ) {
-    if (isPieceAt(x, z)) {
-      return true;
-    }
-    x += stepX;
-    z += stepZ;
-  }
-
-  return false;
-}
 
     function showPossibleMoves(piece) {
-  clearHighlights();
-  for (let x = 0; x < 8; x++) {
-    for (let z = 0; z < 8; z++) {
-      if (isValidMove(piece, x, z) && !isPieceAt(x, z, piece.userData.color)) {
-        const highlight = new THREE.Mesh(
-          new THREE.BoxGeometry(squareSize, 0.2, squareSize),
-          highlightMaterial
-        );
-        highlight.position.set(x - boardWidth / 2 + 0.5, 0.1, z - boardHeight / 2 + 0.5);
-        highlight.position.multiplyScalar(2); // Scale position
-        boardGroup.add(highlight);
-        highlightedSquares.push(highlight);
+      clearHighlights();
+      for (let x = 0; x < 8; x++) {
+        for (let z = 0; z < 8; z++) {
+          if (isValidMove(piece, x, z) && !isPieceAt(x, z, piece.userData.color)) {
+            const highlight = new THREE.Mesh(
+              new THREE.BoxGeometry(squareSize, 0.2, squareSize),
+              highlightMaterial
+            );
+            highlight.position.set(x - boardWidth / 2 + 0.5, 0.1, z - boardHeight / 2 + 0.5);
+            highlight.position.multiplyScalar(2);
+            boardGroup.add(highlight);
+            highlightedSquares.push(highlight);
+          }
+        }
       }
     }
-  }
-}
 
     function clearHighlights() {
       highlightedSquares.forEach(highlight => boardGroup.remove(highlight));
@@ -363,111 +219,125 @@ function isPieceBlocking(piece, newX, newZ) {
     }
 
     function movePiece(piece, newX, newZ) {
-  const capturedPiece = getPieceAt(newX, newZ);
-  if (capturedPiece) {
-    boardGroup.remove(capturedPiece);
-    pieces.splice(pieces.indexOf(capturedPiece), 1);
+      const capturedPiece = getPieceAt(newX, newZ);
+      if (capturedPiece) {
+        boardGroup.remove(capturedPiece);
+        pieces.splice(pieces.indexOf(capturedPiece), 1);
+      }
 
-    if (capturedPiece.userData.type === 'king') {
-      endGame(piece.userData.color);
-      return;
+      piece.position.x = (newX - boardWidth / 2 + 0.5) * 2;
+      piece.position.z = (newZ - boardHeight / 2 + 0.5) * 2;
+      piece.userData.x = newX;
+      piece.userData.z = newZ;
+
+      currentTurn = currentTurn === 'white' ? 'black' : 'white';
+      updateTurnIndicator();
+      if (currentTurn === 'black') {
+        setTimeout(makeAIMove, 500);
+      }
     }
-  }
 
-  piece.position.x = (newX - boardWidth / 2 + 0.5) * 2;
-  piece.position.z = (newZ - boardHeight / 2 + 0.5) * 2;
-  piece.userData.x = newX;
-  piece.userData.z = newZ;
+    function makeAIMove() {
+      const blackPieces = pieces.filter(p => p.userData.color === 'black');
+      let bestMove = null;
+      let bestScore = -Infinity;
 
-  currentTurn = currentTurn === 'white' ? 'black' : 'white';
-  if (currentTurn === 'black') {
-    setTimeout(makeAIMove, 500);
-  }
-}
+      blackPieces.forEach(piece => {
+        for (let x = 0; x < 8; x++) {
+          for (let z = 0; z < 8; z++) {
+            if (isValidMove(piece, x, z) && !isPieceAt(x, z, 'black')) {
+              const capturedPiece = getPieceAt(x, z);
+              const moveScore = evaluateMove(piece, x, z, capturedPiece);
+              if (moveScore > bestScore) {
+                bestScore = moveScore;
+                bestMove = { piece, x, z };
+              }
+            }
+          }
+        }
+      });
 
-function endGame(winningColor) {
-  alert(`Game Over! ${winningColor.charAt(0).toUpperCase() + winningColor.slice(1)} wins!`);
-
-}
-function makeAIMove() {
-  const validMoves = getAllValidMoves('black');
-  
-  if (validMoves.length === 0) {
-    if (isKingInCheck('black')) {
-      console.log("Checkmate! White wins!");
-    } else {
-      console.log("Stalemate!");
+      if (bestMove) {
+        movePiece(bestMove.piece, bestMove.x, bestMove.z);
+      }
     }
-    return;
-  }
-  
-  let bestMove = null;
-  let bestScore = -Infinity;
-  
-  validMoves.forEach(move => {
-    const score = evaluateMove(move);
-    if (score > bestScore) {
-      bestScore = score;
-      bestMove = move;
+
+    function evaluateMove(piece, x, z, capturedPiece) {
+      let score = 0;
+      if (capturedPiece) {
+        score += getPieceValue(capturedPiece.userData.type) * 2;
+      }
+      score += (Math.abs(x - 3.5) + Math.abs(z - 3.5)) * -0.1;
+      score += Math.random() * 0.2;
+      return score;
     }
-  });
-  
-  if (bestMove) {
-    movePiece(bestMove.piece, bestMove.x, bestMove.z);
-  }
-}
+
+    function getPieceValue(type) {
+      switch (type) {
+        case 'pawn': return 1;
+        case 'knight': case 'bishop': return 3;
+        case 'rook': return 5;
+        case 'queen': return 9;
+        case 'king': return 100;
+        default: return 0;
+      }
+    }
+
+    function updateTurnIndicator() {
+      document.getElementById('turnIndicator').textContent = `Current Turn: ${currentTurn.charAt(0).toUpperCase() + currentTurn.slice(1)}`;
+    }
 
     function onMouseDown(event) {
-  event.preventDefault();
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      event.preventDefault();
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-  raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects(pieces);
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(pieces);
 
-  if (intersects.length > 0 && intersects[0].object.userData.color === currentTurn) {
-    if (selectedPiece) {
-      selectedPiece.position.y -= 0.4; // Changed from 0.2 to 0.4
-    }
-    selectedPiece = intersects[0].object;
-    selectedPiece.position.y += 0.4; // Changed from 0.2 to 0.4
-    showPossibleMoves(selectedPiece);
-  } else if (selectedPiece) {
-    const boardIntersects = raycaster.intersectObjects(boardGroup.children.filter(child => child.geometry.type === 'BoxGeometry'));
-    if (boardIntersects.length > 0) {
-      const newPosition = boardIntersects[0].point;
-      const newX = Math.round((newPosition.x + boardWidth) / 2 - 0.5);
-      const newZ = Math.round((newPosition.z + boardHeight) / 2 - 0.5);
+      if (intersects.length > 0 && intersects[0].object.userData.color === currentTurn) {
+        if (selectedPiece) {
+          selectedPiece.position.y -= 0.4;
+        }
+        selectedPiece = intersects[0].object;
+        selectedPiece.position.y += 0.4;
+        showPossibleMoves(selectedPiece);
+      } else if (selectedPiece) {
+        const boardIntersects = raycaster.intersectObjects(boardGroup.children.filter(child => child.geometry.type === 'BoxGeometry'));
+        if (boardIntersects.length > 0) {
+          const newPosition = boardIntersects[0].point;
+          const newX = Math.round((newPosition.x + boardWidth) / 2 - 0.5);
+          const newZ = Math.round((newPosition.z + boardHeight) / 2 - 0.5);
 
-      if (isValidMove(selectedPiece, newX, newZ) && !isPieceAt(newX, newZ, currentTurn)) {
-        movePiece(selectedPiece, newX, newZ);
-        clearHighlights();
-      }
-      selectedPiece.position.y = 0.6; // Changed from 0.3 to 0.6
-      selectedPiece = null;
+          if (isValidMove(selectedPiece, newX, newZ) && !isPieceAt(newX, newZ, currentTurn)) {
+            movePiece(selectedPiece, newX, newZ);
+            clearHighlights();
+          }
+          selectedPiece.position.y = 0.6;
+          selectedPiece = null;
     }
   }
 }
-    function animate() {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
-    }
 
-    document.addEventListener('wheel', onMouseWheel);
-    document.addEventListener('mousedown', onMouseDown);
+    document.getElementById('resetViewBtn').addEventListener('click', () => {
+      camera.position.set(0, 14, 20);
+      camera.lookAt(0, 0, 0);
+      controls.reset();
+    });
 
+    
     animate();
 
-    window.addEventListener('resize', onWindowResize, false);
+window.addEventListener('resize', onWindowResize, false);
 
-    function onWindowResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
 
-    document.getElementById('zoomInBtn').addEventListener('click', () => zoom(-1));
-    document.getElementById('zoomOutBtn').addEventListener('click', () => zoom(1));
+document.getElementById('zoomInBtn').addEventListener('click', () => zoom(-1));
+document.getElementById('zoomOutBtn').addEventListener('click', () => zoom(1));
   </script>
 </body>
 </html>
