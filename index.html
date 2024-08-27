@@ -286,58 +286,62 @@
     function updateTurnIndicator() {
       document.getElementById('turnIndicator').textContent = `Current Turn: ${currentTurn.charAt(0).toUpperCase() + currentTurn.slice(1)}`;
     }
-
     function onMouseDown(event) {
-      event.preventDefault();
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  event.preventDefault();
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(pieces);
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(pieces);
 
-      if (intersects.length > 0 && intersects[0].object.userData.color === currentTurn) {
-        if (selectedPiece) {
-          selectedPiece.position.y -= 0.4;
-        }
-        selectedPiece = intersects[0].object;
-        selectedPiece.position.y += 0.4;
-        showPossibleMoves(selectedPiece);
-      } else if (selectedPiece) {
-        const boardIntersects = raycaster.intersectObjects(boardGroup.children.filter(child => child.geometry.type === 'BoxGeometry'));
-        if (boardIntersects.length > 0) {
-          const newPosition = boardIntersects[0].point;
-          const newX = Math.round((newPosition.x + boardWidth) / 2 - 0.5);
-          const newZ = Math.round((newPosition.z + boardHeight) / 2 - 0.5);
+  if (intersects.length > 0 && intersects[0].object.userData.color === currentTurn) {
+    if (selectedPiece) {
+      selectedPiece.position.y -= 0.4;
+    }
+    selectedPiece = intersects[0].object;
+    selectedPiece.position.y += 0.4;
+    showPossibleMoves(selectedPiece);
+  } else if (selectedPiece) {
+    const boardIntersects = raycaster.intersectObjects(boardGroup.children.filter(child => child.geometry.type === 'BoxGeometry'));
+    if (boardIntersects.length > 0) {
+      const newPosition = boardIntersects[0].point;
+      const newX = Math.round((newPosition.x + boardWidth) / 2 - 0.5);
+      const newZ = Math.round((newPosition.z + boardHeight) / 2 - 0.5);
 
-          if (isValidMove(selectedPiece, newX, newZ) && !isPieceAt(newX, newZ, currentTurn)) {
-            movePiece(selectedPiece, newX, newZ);
-            clearHighlights();
-          }
-          selectedPiece.position.y = 0.6;
-          selectedPiece = null;
+      if (isValidMove(selectedPiece, newX, newZ) && !isPieceAt(newX, newZ, currentTurn)) {
+        movePiece(selectedPiece, newX, newZ);
+        selectedPiece.position.y -= 0.4;
+        selectedPiece = null;
+        clearHighlights();
+      }
     }
   }
 }
 
-    document.getElementById('resetViewBtn').addEventListener('click', () => {
-      camera.position.set(0, 14, 20);
-      camera.lookAt(0, 0, 0);
-      controls.reset();
-    });
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
 
-    
-    animate();
+animate();
 
-window.addEventListener('resize', onWindowResize, false);
+window.addEventListener('mousedown', onMouseDown);
+window.addEventListener('resize', onWindowResize);
+
+document.getElementById('zoomInBtn').addEventListener('click', () => zoom(-1));
+document.getElementById('zoomOutBtn').addEventListener('click', () => zoom(1));
+document.getElementById('resetViewBtn').addEventListener('click', () => {
+  camera.position.set(0, 14, 20);
+  camera.lookAt(0, 0, 0);
+  controls.reset();
+});
 
 function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
-
-document.getElementById('zoomInBtn').addEventListener('click', () => zoom(-1));
-document.getElementById('zoomOutBtn').addEventListener('click', () => zoom(1));
-  </script>
+   </script>
 </body>
 </html>
