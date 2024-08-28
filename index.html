@@ -96,7 +96,64 @@
       align-items: center;
       color: white;
     }
-    
+
+
+    #controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.7);
+      padding: 10px;
+      border-radius: 5px;
+    }
+    button {
+      background-color: #3498db;
+      border: none;
+      color: white;
+      padding: 5px 10px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 14px;
+      margin: 2px 2px;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    #banner {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #quote {
+      flex: 2;
+      text-align: center;
+      font-style: italic;
+    }
+    #message-box {
+      flex: 1;
+      text-align: center;
+    }
+    #image-space {
+      flex: 1;
+      height: 100px;
+      width: 100px;
+      background-color: #34495e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+    }
+
   </style>
 </head>
 <div id="controls">
@@ -106,16 +163,80 @@
 <div id="banner">
   <div id="quote"></div>
   <div id="message-box">
-    <input type="text" id="message-input" placeholder="Enter message">
-    <button id="send-button">Send</button>
+    <!-- <input type="text" id="message-input" placeholder="Enter message">
+    <button id="send-button">Send</button> -->
   </div>
   <div id="image-space">Image Placeholder</div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
- 
+ const playerImages = [
+      "/images-r/image.png",
+      "/images-r/image1.png",
+      "/images-r/image2.png",
+      "/images-r/image3.png",
+   
+    ];
 
-  // New code for the banner 
+    const aiImages = [
+      "/ai_images/move1.jpg",
+      "/ai_images/move2.jpg",
+      "/ai_images/move3.jpg",
+      "/ai_images/move4.jpg",
+      "/ai_images/move5.jpg"
+    ];
+
+    function getRandomImage(isPlayer) {
+      const imageSet = isPlayer ? playerImages : aiImages;
+      return imageSet[Math.floor(Math.random() * imageSet.length)];
+    }
+
+    function updateMessage(piece, fromX, fromZ, toX, toZ) {
+      const pieceNames = {
+        pawn: 'Pawn',
+        rook: 'Rook',
+        knight: 'Knight',
+        bishop: 'Bishop',
+        queen: 'Queen',
+        king: 'King'
+      };
+      const files = 'abcdefgh';
+      const ranks = '12345678';
+      const message = `${pieceNames[piece]} moved from ${files[fromX]}${ranks[fromZ]} to ${files[toX]}${ranks[toZ]}`;
+      document.getElementById('message-box').textContent = message;
+    }
+
+    function updateImage(isPlayer) {
+      const imageSpace = document.getElementById('image-space');
+      imageSpace.innerHTML = `<img src="${getRandomImage(isPlayer)}" alt="Chess move visualization" />`;
+    }
+
+    // Modify the movePiece function
+    function movePiece(piece, newX, newZ) {
+      const fromX = piece.userData.x;
+      const fromZ = piece.userData.z;
+      const capturedPiece = getPieceAt(newX, newZ);
+      if (capturedPiece) {
+        boardGroup.remove(capturedPiece);
+        pieces.splice(pieces.indexOf(capturedPiece), 1);
+      }
+
+      piece.position.x = (newX - boardWidth / 2 + 0.5) * 2;
+      piece.position.z = (newZ - boardHeight / 2 + 0.5) * 2;
+      piece.userData.x = newX;
+      piece.userData.z = newZ;
+
+      updateMessage(piece.userData.type, fromX, fromZ, newX, newZ);
+      updateImage(currentTurn === 'white');
+
+      currentTurn = currentTurn === 'white' ? 'black' : 'white';
+      if (currentTurn === 'black') {
+        setTimeout(makeAIMove, 500);
+      }
+    }
+
+
+
   const quotes = [
   // War and Peace Quotes
   "Peace is not the absence of conflict, it is the presence of justice. - Martin Luther King Jr.",
@@ -169,11 +290,7 @@
 
   document.getElementById('quote').textContent = getRandomQuote();
 
-  document.getElementById('send-button').addEventListener('click', function() {
-    const message = document.getElementById('message-input').value;
-    alert('Message sent: ' + message);
-    document.getElementById('message-input').value = '';
-  });
+
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -426,6 +543,10 @@ function createPiece(geometry, material, x, z, type, color) {
 
     document.getElementById('zoomInBtn').addEventListener('click', () => zoom(-1));
     document.getElementById('zoomOutBtn').addEventListener('click', () => zoom(1));
+    document.getElementById('quote').textContent = getRandomQuote();
+
+   
+    updateImage(true);
   </script>
 </body>
 </html>
