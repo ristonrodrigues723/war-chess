@@ -143,16 +143,24 @@
       flex: 1;
       text-align: center;
     }
+
+
     #image-space {
-      flex: 1;
-      height: 100px;
-      width: 100px;
-      background-color: #34495e;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      color: white;
-    }
+  flex: 0 0 100px;
+  height: 100px;
+  width: 100px;
+  background-color: #34495e;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+#image-space img {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+}
 
   </style>
 </head>
@@ -179,63 +187,13 @@
     ];
 
     const aiImages = [
-      "/ai_images/move1.jpg",
-      "/ai_images/move2.jpg",
-      "/ai_images/move3.jpg",
-      "/ai_images/move4.jpg",
-      "/ai_images/move5.jpg"
+      "/images-h/1.png",
+      "/images-h/2.png",
+     "/images-h/3.png",
+      
     ];
 
-    function getRandomImage(isPlayer) {
-      const imageSet = isPlayer ? playerImages : aiImages;
-      return imageSet[Math.floor(Math.random() * imageSet.length)];
-    }
-
-    function updateMessage(piece, fromX, fromZ, toX, toZ) {
-      const pieceNames = {
-        pawn: 'Pawn',
-        rook: 'Rook',
-        knight: 'Knight',
-        bishop: 'Bishop',
-        queen: 'Queen',
-        king: 'King'
-      };
-      const files = 'abcdefgh';
-      const ranks = '12345678';
-      const message = `${pieceNames[piece]} moved from ${files[fromX]}${ranks[fromZ]} to ${files[toX]}${ranks[toZ]}`;
-      document.getElementById('message-box').textContent = message;
-    }
-
-    function updateImage(isPlayer) {
-      const imageSpace = document.getElementById('image-space');
-      imageSpace.innerHTML = `<img src="${getRandomImage(isPlayer)}" alt="Chess move visualization" />`;
-    }
-
-    // Modify the movePiece function
-    function movePiece(piece, newX, newZ) {
-      const fromX = piece.userData.x;
-      const fromZ = piece.userData.z;
-      const capturedPiece = getPieceAt(newX, newZ);
-      if (capturedPiece) {
-        boardGroup.remove(capturedPiece);
-        pieces.splice(pieces.indexOf(capturedPiece), 1);
-      }
-
-      piece.position.x = (newX - boardWidth / 2 + 0.5) * 2;
-      piece.position.z = (newZ - boardHeight / 2 + 0.5) * 2;
-      piece.userData.x = newX;
-      piece.userData.z = newZ;
-
-      updateMessage(piece.userData.type, fromX, fromZ, newX, newZ);
-      updateImage(currentTurn === 'white');
-
-      currentTurn = currentTurn === 'white' ? 'black' : 'white';
-      if (currentTurn === 'black') {
-        setTimeout(makeAIMove, 500);
-      }
-    }
-
-
+    
 
   const quotes = [
   // War and Peace Quotes
@@ -284,14 +242,37 @@
   "War is a choice, not a necessity. - Arundhati Roy"
 ];
 
-  function getRandomQuote() {
-    return quotes[Math.floor(Math.random() * quotes.length)];
-  }
+function getRandomImage(isPlayer) {
+  const imageSet = isPlayer ? playerImages : aiImages;
+  return imageSet[Math.floor(Math.random() * imageSet.length)];
+}
 
+function getRandomQuote() {
+  return quotes[Math.floor(Math.random() * quotes.length)];
+}
+
+function updateMessage(piece, fromX, fromZ, toX, toZ) {
+  const pieceNames = { pawn: 'Pawn', rook: 'Rook', knight: 'Knight', bishop: 'Bishop', queen: 'Queen', king: 'King' };
+  const files = 'abcdefgh';
+  const ranks = '12345678';
+  const message = `${pieceNames[piece]} moved from ${files[fromX]}${ranks[fromZ]} to ${files[toX]}${ranks[toZ]}`;
+  document.getElementById('message-box').textContent = message;
+}
+
+function updateImage(isPlayer) {
+  const imageSpace = document.getElementById('image-space');
+  imageSpace.innerHTML = `<img src="${getRandomImage(isPlayer)}" alt="Chess move visualization" />`;
+}
+
+function updateQuote() {
   document.getElementById('quote').textContent = getRandomQuote();
+}
 
-
-
+function updateTurnDisplay() {
+  const messageBox = document.getElementById('message-box');
+  const currentTurnMessage = `Current Turn: ${currentTurn.charAt(0).toUpperCase() + currentTurn.slice(1)}`;
+  messageBox.textContent += ` | ${currentTurnMessage}`;
+}
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -455,6 +436,29 @@ function createPiece(geometry, material, x, z, type, color) {
     }
 
     function movePiece(piece, newX, newZ) {
+  const fromX = piece.userData.x;
+function updateMessage(piece, fromX, fromZ, toX, toZ) {
+  const pieceNames = { pawn: 'Pawn', rook: 'Rook', knight: 'Knight', bishop: 'Bishop', queen: 'Queen', king: 'King' };
+  const files = 'abcdefgh';
+  const ranks = '12345678';
+  const message = `${pieceNames[piece]} moved from ${files[fromX]}${ranks[fromZ]} to ${files[toX]}${ranks[toZ]}`;
+  document.getElementById('message-box').textContent = message;
+}
+
+function updateImage(isPlayer) {
+  const imageSpace = document.getElementById('image-space');
+  imageSpace.innerHTML = `<img src="${getRandomImage(isPlayer)}" alt="Chess move visualization" />`;
+}
+
+function updateQuote() {
+  document.getElementById('quote').textContent = getRandomQuote();
+}
+
+function updateTurnDisplay() {
+  const messageBox = document.getElementById('message-box');
+  const currentTurnMessage = `Current Turn: ${currentTurn.charAt(0).toUpperCase() + currentTurn.slice(1)}`;
+  messageBox.textContent += ` | ${currentTurnMessage}`;
+}  const fromZ = piece.userData.z;
   const capturedPiece = getPieceAt(newX, newZ);
   if (capturedPiece) {
     boardGroup.remove(capturedPiece);
@@ -466,12 +470,17 @@ function createPiece(geometry, material, x, z, type, color) {
   piece.userData.x = newX;
   piece.userData.z = newZ;
 
+  updateMessage(piece.userData.type, fromX, fromZ, newX, newZ);
+  updateImage(currentTurn === 'white');
+  updateQuote();
+
   currentTurn = currentTurn === 'white' ? 'black' : 'white';
+  updateTurnDisplay();
+
   if (currentTurn === 'black') {
     setTimeout(makeAIMove, 500);
   }
 }
-
     function makeAIMove() {
       const blackPieces = pieces.filter(p => p.userData.color === 'black');
       const validMoves = [];
@@ -546,7 +555,10 @@ function createPiece(geometry, material, x, z, type, color) {
     document.getElementById('quote').textContent = getRandomQuote();
 
    
-    updateImage(true);
+    
+    updateQuote();
+updateImage(true);
+updateTurnDisplay();
   </script>
 </body>
 </html>
